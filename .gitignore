@@ -1,0 +1,19 @@
+# Virtual environment
+.venv/
+venv/
+
+# Secrets
+.env
+
+# Python cache
+_pycache_/
+*.pyc
+
+# OS / editor junk
+.DS_Store
+.vscode/
+.idea/
+
+# Strategy spec stays local; only the canonical demo scenario is committed
+spec/*
+!spec/adam_scenario.md
