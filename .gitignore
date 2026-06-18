@@ -6,7 +6,7 @@ venv/
 .env
 
 # Python cache
-__pycache__/
+_pycache_/
 *.pyc
 
 # OS / editor junk
@@ -14,5 +14,6 @@ __pycache__/
 .vscode/
 .idea/
 
-spec
-
+# Strategy spec stays local; only the canonical demo scenario is committed
+spec/*
+!spec/adam_scenario.md
