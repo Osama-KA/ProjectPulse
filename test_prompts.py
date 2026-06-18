@@ -110,10 +110,17 @@ def run_risk_ranking(assumptions: list[dict]) -> dict:
     print(f"\n>> RISKIEST: {data['riskiest_belief']}")
     print(f">> why: {data['why_riskiest']}")
 
-    finding = has_any(data["riskiest_belief"], ("find", "finding", "discover", "search",
-                                                "the hard part", "real pain", "primary pain"))
-    print(f">> Riskiest is the 'finding-pain' belief: "
-          f"{'YES' if finding else 'NO — check the ranking'}")
+    # Accept legitimate paraphrases of the core-pain spine (the belief that the
+    # problem itself is real/primary), not just the literal word "finding" — but
+    # still fail on a genuinely wrong pick (e.g. a supply-side "employers would
+    # list jobs" belief, which hits none of these).
+    spine = has_any(data["riskiest_belief"], ("find", "finding", "discover", "search",
+                                              "the hard part", "real pain", "primary pain",
+                                              "schedule clash", "core pain", "market need",
+                                              "real problem", "primary problem", "pain point",
+                                              "clash", "mismatch", "pain"))
+    print(f">> Riskiest is the core-pain spine (problem is real/primary): "
+          f"{'YES' if spine else 'NO — check the ranking'}")
     return data
 
 

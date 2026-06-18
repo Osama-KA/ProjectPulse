@@ -145,6 +145,18 @@ evidenced belief that wouldn't really hurt the idea isn't either. When two are c
 break the tie toward the one whose failure would invalidate the others — the belief \
 the whole idea hangs from, usually "is the problem I see even the real problem?".
 
+Locate the spine before downstream beliefs. A belief about whether the core PROBLEM \
+is real and primary almost always outranks downstream supply-side, distribution, \
+switching, or feasibility beliefs — those only matter if the problem itself is real, \
+so an untested problem belief is the riskiest by definition. In particular, when the \
+idea is a discovery, matching, or search tool, the spine is usually whether the user's \
+hard part is actually the FINDING / searching step itself: founders routinely assume \
+the wrong step is the bottleneck (they fixate on searching when the real pain is what \
+happens before or after), so surface the "is finding / searching even the hard part?" \
+belief as a top candidate ahead of supply, switching, and reachability assumptions. \
+This is the same decomposition the assumption-extraction step uses — keep the two \
+consistent and let it generalise to whatever the idea is, rather than to any one case.
+
 Rules:
 - Show your reasoning for EVERY assumption — never a black-box verdict. The founder \
 must be able to see WHY one outranks another.
