@@ -3,22 +3,12 @@
 Run:  ./.venv/Scripts/python.exe test_prompts.py
 """
 import json
-import re
 import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-from llm import ask
+from llm import ask, parse_json
 from prompts import ADAM_SESSION_1, ASSUMPTION_EXTRACTION, PRE_MORTEM
-
-
-def parse_json(text: str) -> dict:
-    """Tolerant JSON extraction — strips ``` fences or stray prose if present."""
-    text = text.strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
-    start, end = text.find("{"), text.rfind("}")
-    return json.loads(text[start : end + 1])
 
 
 def run_assumptions():

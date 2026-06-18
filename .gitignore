@@ -6,8 +6,12 @@ venv/
 .env
 
 # Python cache
-_pycache_/
+__pycache__/
 *.pyc
+
+# Per-run validation ledger (state, not source)
+memory.json
+memory.json.tmp
 
 # OS / editor junk
 .DS_Store
