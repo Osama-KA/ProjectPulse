@@ -236,6 +236,16 @@ def add_kill_criterion(
     return kid
 
 
+def set_kill_status(ledger: dict, assumption_id: str, status: str) -> None:
+    """Flip the status (open|crossed) of any kill criteria on an assumption —
+    used when the founder's evidence trips a pre-set quit signal."""
+    if status not in ("open", "crossed"):
+        raise ValueError(f"Invalid kill status {status!r}")
+    for k in ledger["kill_criteria"]:
+        if k["assumption_id"] == assumption_id:
+            k["status"] = status
+
+
 # ---------------------------------------------------------------------------
 # Snapshots
 # ---------------------------------------------------------------------------

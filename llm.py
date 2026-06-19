@@ -42,4 +42,28 @@ def parse_json(text: str) -> dict:
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
     start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end == -1:
+        raise ValueError("no JSON object found in model output")
     return json.loads(text[start : end + 1])
+
+
+def ask_json(system: str, user: str, client: OpenAI | None = None, retries: int = 1) -> dict:
+    """ask() + parse_json() with a one-shot retry.
+
+    Reasoning models occasionally return an empty or non-JSON completion. A
+    single retry clears nearly all of these, keeping a live demo from dying on a
+    transient. Raises ValueError with a short diagnostic if it still fails.
+    """
+    client = client or get_client()
+    last_err: Exception | None = None
+    last_text = ""
+    for _ in range(retries + 1):
+        last_text = ask(system, user, client)
+        try:
+            return parse_json(last_text)
+        except (json.JSONDecodeError, ValueError) as e:
+            last_err = e
+    raise ValueError(
+        f"Model did not return valid JSON after {retries + 1} attempts "
+        f"({last_err}). Output head: {last_text[:120]!r}"
+    )

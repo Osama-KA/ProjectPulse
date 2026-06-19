@@ -1,0 +1,15 @@
+# Project Pulse — slate-blue on light.
+# A trustworthy, decision-grade look: deep slate-blue accent, clean white
+# canvas, slate-100 sidebar/cards. Tier badges are colored inline in app.py.
+# Palette built around the sidebar cyan-teal #A7DAE2.
+[theme]
+base = "light"
+primaryColor = "#0e7490"
+backgroundColor = "#eaf6f8"
+secondaryBackgroundColor = "#cfeaef"
+textColor = "#0f2b30"
+font = "sans serif"
+
+[server]
+# Keep the demo calm: no auto-rerun prompts mid-presentation.
+runOnSave = false
