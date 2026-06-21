@@ -328,7 +328,8 @@ def render_evidence_result(d: dict):
         st.markdown("**Evidence-tier updates**")
         for u in updates:
             md(f"<div style='margin:.4rem 0'>{tier_badge(u.get('old_tier','Untested'))} "
-               f"→ {tier_badge(u.get('new_tier','Untested'))} &nbsp;<span>{u.get('belief','')}</span></div>")
+               f"→ {tier_badge(u.get('new_tier','Untested'))} &nbsp;"
+               f"<span>{memory.strip_tier_prefix(u.get('belief',''))}</span></div>")
             with st.expander("Why this tier"):
                 st.write(u.get("reasoning", ""))
                 if u.get("evidence_cited"):
@@ -344,7 +345,7 @@ def render_evidence_result(d: dict):
         st.markdown("**New assumption(s) that emerged**")
         for n in new:
             md(f"<div style='margin:.3rem 0'>{fatal_chip(n.get('fatal_if_false','medium'))} "
-               f"<span>{n.get('belief','')}</span></div>")
+               f"<span>{memory.strip_tier_prefix(n.get('belief',''))}</span></div>")
 
 
 def render_decision_moment(d: dict):
@@ -380,7 +381,7 @@ def render_returning_briefing(d: dict):
         st.markdown("**Risk picture**")
         for r in b["risk_picture"]:
             md(f"<div style='margin:.4rem 0'>{tier_badge(r.get('tier','Untested'))} "
-               f"<span>{r.get('belief','')}</span></div>")
+               f"<span>{memory.strip_tier_prefix(r.get('belief',''))}</span></div>")
             if r.get("why_tier"):
                 st.markdown(f"<small style='color:#475569'>{r['why_tier']}</small>",
                             unsafe_allow_html=True)
@@ -589,23 +590,18 @@ def main():
         st.rerun()
 
     disabled = st.session_state.stage != "idle" or st.session_state.work is not None
-    pivot_flag = False
     if mode == "wrap":
         placeholder = "Log what you learned — interviews, signups, a competitor sighting…"
     elif st.session_state.ledger["snapshots"]:
-        placeholder = "Where do I stand? (or describe a pivot)"
-        # Pivot is an EXPLICIT choice, never guessed from phrasing — so a normal
-        # "where do I stand?" can't overwrite the idea (spec Crack 2 principle).
-        pivot_flag = st.checkbox(
-            "🔀 This is a pivot — I'm changing direction", key="pivot_chk", disabled=disabled,
-            help="Tick only if you're redirecting the idea. Leave it unticked to just ask where "
-                 "you stand — Pulse won't overwrite your idea unless you say so.")
+        placeholder = "Where do I stand?"
     else:
         placeholder = "Describe the idea you want to build…"
     text = st.chat_input(placeholder, disabled=disabled)
     if text:
         st.session_state.pending_input = text
-        st.session_state.pending_pivot = pivot_flag
+        # Pivot is an EXPLICIT action (the ③ Pivot button), never guessed from a
+        # typed message — so a normal "where do I stand?" can't overwrite the idea.
+        st.session_state.pending_pivot = False
         st.rerun()
 
 

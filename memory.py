@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 from datetime import datetime, timezone
 
 DEFAULT_PATH = "memory.json"
@@ -21,6 +22,23 @@ DEFAULT_PATH = "memory.json"
 # The four evidence-tier bands — the ONLY allowed confidence labels (spec Crack 1).
 # Never a percentage, never a binary "validated". Ordered thinnest -> strongest.
 TIERS = ["Untested", "Weak signal", "Contested", "Supported"]
+
+# Models sometimes prepend the tier to the belief text itself, e.g.
+# "Untested — students find it hard…" or "[Weak signal] …". The tier is shown as a
+# separate badge, so a baked-in label renders as "(Untested) Untested — …" and goes
+# stale when the badge changes. Strip it deterministically at ingestion / display.
+_TIER_PREFIX = re.compile(
+    r"^\s*(?:"
+    r"[\[(]\s*(?:untested|weak\s*signal|contested|supported)\s*[\])]"   # [Untested] / (Weak signal)
+    r"|(?:untested|weak\s*signal|contested|supported)(?=\s*[—–\-:])"     # bare label + separator
+    r")\s*[—–\-:]*\s*",
+    re.IGNORECASE,
+)
+
+
+def strip_tier_prefix(text: str) -> str:
+    """Remove a leading evidence-tier label a model baked into the belief text."""
+    return _TIER_PREFIX.sub("", (text or "").strip()).strip()
 
 # fatal-if-false levels, ordered.
 FATAL_LEVELS = ["low", "medium", "high"]
@@ -117,7 +135,7 @@ def add_assumptions(
     existing = {a["belief"].strip().lower() for a in ledger["assumptions"]}
     new_ids: list[str] = []
     for item in items:
-        belief = (item.get("belief") or item.get("testable_assumption") or "").strip()
+        belief = strip_tier_prefix(item.get("belief") or item.get("testable_assumption") or "")
         if not belief or belief.lower() in existing:
             continue
         why = item.get("why_load_bearing") or item.get("failure_mode") or ""
