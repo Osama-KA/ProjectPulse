@@ -14,6 +14,7 @@ right baseline (it diffs the live ledger against the previous session's snapshot
 from __future__ import annotations
 
 import json
+import re
 
 import change_detector
 import memory
@@ -83,6 +84,21 @@ def _looks_like_pivot(statement: str) -> bool:
     return any(h in s for h in _PIVOT_HINTS)
 
 
+def _clean_pivot_idea(statement: str) -> str:
+    """On a pivot, store the new DIRECTION, not a tacked-on status question.
+
+    Drops trailing "where do I stand / what should I do next" style sentences so
+    the ledger's idea stays a clean statement of the new direction. Never returns
+    empty — if the whole message is a question, it keeps it verbatim.
+    """
+    parts = re.split(r"(?<=[.!?])\s+", statement.strip())
+    meta = re.compile(r"\b(where (do|does)( my)? idea|where i stand|"
+                      r"what should i do|what'?s next)\b", re.I)
+    while len(parts) > 1 and meta.search(parts[-1]):
+        parts.pop()
+    return " ".join(parts).strip() or statement.strip()
+
+
 # ---------------------------------------------------------------------------
 # Start mode — first session (intake)
 # ---------------------------------------------------------------------------
@@ -116,14 +132,21 @@ def start_first(ledger: dict, idea: str, client=None) -> dict:
 # ---------------------------------------------------------------------------
 # Start mode — returning session (the continuity briefing / money shot)
 # ---------------------------------------------------------------------------
-def start_return(ledger: dict, statement: str, client=None) -> dict:
+def start_return(ledger: dict, statement: str, client=None,
+                 pivot: bool | None = None) -> dict:
     """Returning Start: optionally absorb a pivot, re-rank, diff vs the last
-    snapshot, and produce the SESSION_BRIEFING that reconstructs the arc."""
+    snapshot, and produce the SESSION_BRIEFING that reconstructs the arc.
+
+    `pivot` is an EXPLICIT signal from the caller (the UI's pivot checkbox / demo
+    button). Only when it is left None do we fall back to the word-based hint — so
+    a normal returning message like "where do I stand?" can never silently
+    overwrite the idea (it used to: _PIVOT_HINTS matches "i want", "instead", ...).
+    """
     _begin_session(ledger)
 
-    pivoted = _looks_like_pivot(statement)
+    pivoted = _looks_like_pivot(statement) if pivot is None else pivot
     if pivoted:
-        memory.set_idea(ledger, statement)  # history captures the old idea
+        memory.set_idea(ledger, _clean_pivot_idea(statement))  # history keeps the old idea
 
     # Re-rank first so the diff registers any riskiest shift, then diff against
     # the previous session's snapshot (taken before this session's own).
@@ -194,8 +217,17 @@ def wrap(ledger: dict, evidence_text: str, client=None) -> dict:
         except (ValueError, KeyError):
             pass  # illegal tier or unknown id — skip rather than crash the demo
 
-    memory.add_evidence(ledger, evidence_text, session,
-                        interpretation=interp.get("evidence_summary", ""))
+    # Link the evidence to the assumptions it moved, and persist the
+    # false-positive reasoning to the ledger (not just the transcript) so the
+    # decision journal — the "moat" — is complete.
+    touched = [u["id"] for u in interp.get("assumption_updates", [])
+               if memory.get_assumption(ledger, u.get("id"))]
+    fp_text = "; ".join(
+        f"{f.get('concern', '')}: {f.get('why', '')}".strip(": ")
+        for f in interp.get("false_positive_flags", []))
+    memory.add_evidence(ledger, evidence_text, session, touches=touched,
+                        interpretation=interp.get("evidence_summary", ""),
+                        false_positive_flag=fp_text)
     emerged_ids = memory.add_assumptions(
         ledger, interp.get("new_assumptions", []), "emerged", session)
 

@@ -99,6 +99,8 @@ TIER_COLORS = {
     "Supported": "#16a34a",     # green
 }
 FATAL_COLORS = {"high": "#dc2626", "medium": "#d97706", "low": "#65a30d"}
+FATAL_ORDER = {"high": 0, "medium": 1, "low": 2}  # most-fatal-first sort key
+ASSUMPTIONS_VISIBLE = 6  # cap before the "show more" expander (extraction + pre-mortem = ~13)
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +140,8 @@ def init_state():
         st.session_state.transcript = []      # [{role, kind, data}]
         st.session_state.stage = "idle"        # idle | await_decision1 | await_approval | await_decision2
         st.session_state.pending_input = None  # text queued for processing
-        st.session_state.work = None           # (text, mode) being processed this run
+        st.session_state.pending_pivot = False # explicit pivot flag for the queued text
+        st.session_state.work = None           # (text, mode, pivot) being processed this run
     # Seed the mode toggle once so the widget never carries both a default and a
     # session-state value (which Streamlit warns about).
     st.session_state.setdefault("mode_seg", START_LABEL)
@@ -147,7 +150,8 @@ def init_state():
 def reset_demo():
     if os.path.exists(memory.DEFAULT_PATH):
         os.remove(memory.DEFAULT_PATH)
-    for k in ("ledger", "transcript", "stage", "pending_input", "work", "mode_seg"):
+    for k in ("ledger", "transcript", "stage", "pending_input", "pending_pivot",
+              "work", "mode_seg", "pivot_chk"):
         st.session_state.pop(k, None)
 
 
@@ -179,11 +183,22 @@ def render_sidebar() -> str:
         st.markdown(f"**Assumptions · {len(open_a)}**")
         if not open_a:
             st.caption("None yet — start a session with your idea.")
-        for a in open_a:
+
+        def _sidebar_row(a):
             star = "📌 " if a["id"] == L["riskiest_assumption_id"] else ""
             belief = a["belief"] if len(a["belief"]) <= 90 else a["belief"][:88] + "…"
             md(f"<div style='margin:.35rem 0'>{tier_badge(a['tier'])} "
                f"<small>{star}{belief}</small></div>")
+
+        # Riskiest pinned first, then most-fatal-first; cap the visible list.
+        ordered = sorted(open_a, key=lambda a: (a["id"] != L["riskiest_assumption_id"],
+                                                FATAL_ORDER.get(a["fatal_if_false"], 1)))
+        for a in ordered[:8]:
+            _sidebar_row(a)
+        if len(ordered) > 8:
+            with st.expander(f"Show {len(ordered) - 8} more"):
+                for a in ordered[8:]:
+                    _sidebar_row(a)
         retired = [a for a in L["assumptions"] if a["status"] == "retired"]
         if retired:
             with st.expander(f"Retired · {len(retired)}"):
@@ -207,22 +222,24 @@ def render_sidebar() -> str:
         if st.button("② Evidence", use_container_width=True, disabled=disabled):
             queue(ADAM_SESSION_2, WRAP_LABEL)
         if st.button("③ Pivot", use_container_width=True, disabled=disabled):
-            queue(ADAM_SESSION_3, START_LABEL)
+            queue(ADAM_SESSION_3, START_LABEL, pivot=True)
         if st.button("↻ Reset demo", use_container_width=True):
             reset_demo()
             st.rerun()
     return mode
 
 
-def queue(text: str, mode_label: str):
+def queue(text: str, mode_label: str, pivot: bool = False):
     """Queue input for processing and align the mode toggle to it.
 
     The mode toggle is applied at the top of main() on the next run — BEFORE the
     segmented_control is instantiated — because Streamlit forbids writing a
-    widget's state key after the widget exists in the same run.
+    widget's state key after the widget exists in the same run. `pivot` is the
+    explicit redirect signal (the ③ demo button passes True).
     """
     st.session_state.pending_mode_label = mode_label
     st.session_state.pending_input = text
+    st.session_state.pending_pivot = pivot
     st.rerun()
 
 
@@ -247,15 +264,27 @@ def render_entry(e: dict):
             render_returning_briefing(d)
 
 
+def _assumption_row(a: dict):
+    md(f"<div style='margin:.4rem 0'>{tier_badge(a['tier'])} &nbsp;{fatal_chip(a['fatal'])}"
+       f"<br><span>{a['belief']}</span></div>")
+    with st.expander("Why this is load-bearing"):
+        st.write(a["why"])
+
+
 def render_first_briefing(d: dict):
     st.markdown("Here's what your idea quietly depends on. I've surfaced the hidden "
                 "assumptions and ranked the **single riskiest** one to test first.")
-    st.markdown("**Assumptions this idea rests on**")
-    for a in d["assumptions"]:
-        md(f"<div style='margin:.4rem 0'>{tier_badge(a['tier'])} &nbsp;{fatal_chip(a['fatal'])}"
-           f"<br><span>{a['belief']}</span></div>")
-        with st.expander("Why this is load-bearing"):
-            st.write(a["why"])
+    # Most fatal-if-false first; show a focused few, the rest behind an expander
+    # (extraction + pre-mortem merge to ~13, too many to dump on the money shot).
+    items = sorted(d["assumptions"], key=lambda a: FATAL_ORDER.get(a.get("fatal", "medium"), 1))
+    top, rest = items[:ASSUMPTIONS_VISIBLE], items[ASSUMPTIONS_VISIBLE:]
+    st.markdown(f"**Assumptions this idea rests on · {len(items)}** (most fatal-if-false first)")
+    for a in top:
+        _assumption_row(a)
+    if rest:
+        with st.expander(f"Show {len(rest)} more assumptions"):
+            for a in rest:
+                _assumption_row(a)
     r = d["riskiest"]
     if r:
         with st.container(border=True):
@@ -389,10 +418,11 @@ def run(label: str, fn, *args):
         return None
 
 
-def do_processing(text: str, mode: str):
+def do_processing(text: str, mode: str, pivot: bool = False):
     """Run the LLM work for a queued turn. The user message is already on the
     transcript; this only appends Pulse's response(s). Called from the work zone
-    just above the input, so its spinner is always in view."""
+    just above the input, so its spinner is always in view. `pivot` is the
+    explicit redirect flag passed through to engine.start_return."""
     L = st.session_state.ledger
 
     if mode == "wrap":
@@ -431,7 +461,7 @@ def do_processing(text: str, mode: str):
         st.session_state.stage = "await_decision1"
     else:
         res = run("Reconstructing the arc, checking what changed, re-ranking the riskiest…",
-                  engine.start_return, L, text, client())
+                  engine.start_return, L, text, client(), pivot)
         if res is None:
             return
         save()
@@ -529,8 +559,10 @@ def main():
     # When new input arrives, record the USER turn now and defer the LLM work to the
     # work zone below — so the spinner renders just above the input, always in view.
     if st.session_state.pending_input is not None and st.session_state.stage == "idle":
-        st.session_state.work = (st.session_state.pending_input, mode)
+        st.session_state.work = (st.session_state.pending_input, mode,
+                                 st.session_state.pending_pivot)
         st.session_state.pending_input = None
+        st.session_state.pending_pivot = False
         add("user", "text", {"text": st.session_state.work[0]})
 
     st.title("Project Pulse")
@@ -551,21 +583,29 @@ def main():
     # Work zone — sits at the bottom of the content, directly above the pinned chat
     # input, so its spinner is always visible without scrolling up.
     if st.session_state.work is not None:
-        text, wmode = st.session_state.work
+        text, wmode, wpivot = st.session_state.work
         st.session_state.work = None
-        do_processing(text, wmode)
+        do_processing(text, wmode, wpivot)
         st.rerun()
 
     disabled = st.session_state.stage != "idle" or st.session_state.work is not None
+    pivot_flag = False
     if mode == "wrap":
         placeholder = "Log what you learned — interviews, signups, a competitor sighting…"
     elif st.session_state.ledger["snapshots"]:
         placeholder = "Where do I stand? (or describe a pivot)"
+        # Pivot is an EXPLICIT choice, never guessed from phrasing — so a normal
+        # "where do I stand?" can't overwrite the idea (spec Crack 2 principle).
+        pivot_flag = st.checkbox(
+            "🔀 This is a pivot — I'm changing direction", key="pivot_chk", disabled=disabled,
+            help="Tick only if you're redirecting the idea. Leave it unticked to just ask where "
+                 "you stand — Pulse won't overwrite your idea unless you say so.")
     else:
         placeholder = "Describe the idea you want to build…"
     text = st.chat_input(placeholder, disabled=disabled)
     if text:
         st.session_state.pending_input = text
+        st.session_state.pending_pivot = pivot_flag
         st.rerun()
 
 

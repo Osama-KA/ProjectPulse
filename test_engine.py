@@ -62,7 +62,7 @@ def main():
 
     # --- Session 3: the pivot re-brief (money shot) -----------------------
     print("[S3] start_return…")
-    sres = engine.start_return(ledger, ADAM_SESSION_3, client)
+    sres = engine.start_return(ledger, ADAM_SESSION_3, client, pivot=True)
     assert sres["diff"]["idea_changed"], "the pivot should register as an idea change"
     b = sres["briefing"]
     assert b.get("where_it_stands") and b.get("the_one_move"), "briefing must stand + name one move"
