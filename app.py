@@ -570,6 +570,29 @@ def main():
     st.caption("Your reasoning partner for figuring out what's actually worth building — "
                "it surfaces the riskiest belief, designs the cheapest test, and remembers the journey.")
 
+    legend_l, legend_r = st.columns(2)
+    with legend_l:
+        with st.expander("🛡️ How Pulse stays honest"):
+            st.markdown(
+                "- **Evidence-tiered confidence, not percentages** — every assumption shows a tier "
+                "(Untested / Weak signal / Contested / Supported) defined by *what evidence exists*, "
+                "never a fake-precise number or a binary \"validated\".\n"
+                "- **Show your work** — every judgment links to the specific evidence behind it, so you "
+                "can audit it instead of trusting a black box.\n"
+                "- **Steelman the opposite** — on any persevere/pivot call, Pulse argues the strongest "
+                "case for *each* option. It's a decision input, not a verdict.")
+    with legend_r:
+        with st.expander("🧭 Built on four decision-science methods"):
+            st.markdown(
+                "- **Riskiest Assumption Test (RAT)** — test the belief most fatal-if-wrong and "
+                "least-supported *before* building anything (Ries / Blank).\n"
+                "- **Pre-mortem** (Gary Klein) — imagine it's six months out and the idea failed, then "
+                "ask why — surfacing failure modes and hidden assumptions up front.\n"
+                "- **Kill criteria / pivot-or-persevere** (Annie Duke; Lean Startup) — pre-commit to the "
+                "evidence that would make you walk away, to fight sunk-cost bias.\n"
+                "- **Decision journal** (Annie Duke) — record your reasoning *at the moment you decide*, "
+                "so a good decision and a good outcome can be told apart later.")
+
     if not st.session_state.transcript:
         with st.chat_message("assistant", avatar="📍"):
             st.markdown("Tell me the idea you're thinking about building, and I'll surface the "
